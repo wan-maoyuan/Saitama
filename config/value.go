@@ -8,6 +8,10 @@ import (
 	"time"
 )
 
+var (
+	_ Value = (*atomicValue)(nil)
+)
+
 type Value interface {
 	Bool() (bool, error)
 	Int() (int64, error)
