@@ -16,7 +16,6 @@ type Saitama struct {
 	ctx    context.Context
 	cancel func()
 	opts   options
-	mu     sync.Mutex
 }
 
 func New(opts ...Option) *Saitama {
@@ -40,7 +39,7 @@ func New(opts ...Option) *Saitama {
 }
 
 func (sa *Saitama) Run() error {
-	if err := sa.opts.beforeStart(sa.ctx); err != nil {
+	if err := sa.beforeStartFunc(sa.ctx); err != nil {
 		return err
 	}
 
@@ -66,7 +65,7 @@ func (sa *Saitama) Run() error {
 	}
 	wg.Wait()
 
-	if err := sa.opts.afterStart(sa.ctx); err != nil {
+	if err := sa.afterStartFunc(sa.ctx); err != nil {
 		return err
 	}
 
@@ -86,17 +85,60 @@ func (sa *Saitama) Run() error {
 		return err
 	}
 
-	return sa.opts.afterStop(sa.ctx)
+	return sa.afterStopFunc(context.Background())
 }
 
 func (sa *Saitama) Stop() error {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	ctx, cancel := context.WithTimeout(context.Background(), sa.opts.stopTimeout)
 	defer cancel()
 
-	err := sa.opts.beforeStop(ctx)
-	if sa.cancel != nil {
-		sa.cancel()
+	if err := sa.beforeStopFunc(ctx); err != nil {
+		return err
 	}
 
-	return err
+	return nil
+}
+
+func (sa *Saitama) beforeStartFunc(ctx context.Context) error {
+	if sa.opts.beforeStart != nil {
+		if err := sa.opts.beforeStart(ctx); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (sa *Saitama) afterStartFunc(ctx context.Context) error {
+	if sa.opts.afterStart != nil {
+		if err := sa.opts.afterStart(ctx); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (sa *Saitama) beforeStopFunc(ctx context.Context) error {
+	if sa.opts.beforeStop != nil {
+		if err := sa.opts.beforeStop(ctx); err != nil {
+			if sa.cancel != nil {
+				sa.cancel()
+			}
+
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (sa *Saitama) afterStopFunc(ctx context.Context) error {
+	if sa.opts.afterStop != nil {
+		if err := sa.opts.afterStop(ctx); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
